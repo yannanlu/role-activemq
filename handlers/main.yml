@@ -1,0 +1,6 @@
+---
+- name: Restart_activemq.service
+  systemd:
+    name: activemq
+    enabled: yes
+    state: restarted
