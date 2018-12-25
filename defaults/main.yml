@@ -3,15 +3,19 @@ activemq_user: activemq
 activemq_group: activemq
 activemq_pidfile: /opt/activemq/data/activemq.pid
 activemq_pkg_name: apache-activemq
-activemq_version: 5.14.3
+activemq_version: 5.15.6
 activemq_repo_url: https://archive.apache.org/dist/activemq
 activemq_systemd_dir: "{{'/usr/lib/systemd' if ansible_distribution in ['RedHat','CentOS'] else '/lib/systemd'}}"
+
+activemq_network_brokers: []
 
 activemq_broker_ip: 127.0.0.1
 activemq_broker_port: 61616
 activemq_broker_user: system
 activemq_broker_passwd: manager
 activemq_guest_passwd: password
+activemq_ks_passwd: password
+activemq_ssl: disabled
 activemq_jmx: disabled
 activemq_store_usage: 5
 activemq_temp_usage: 3
@@ -24,17 +28,11 @@ activemq_admin_ip: 127.0.0.1
 activemq_admin_port: 8161
 activemq_admin_user: admin
 activemq_admin_passwd: admin
+activemq_user_name: user
+activemq_user_passwd: user
 activemq_admin_location:
   service: admin
   proxy: "http://{{activemq_admin_ip}}:{{activemq_admin_port}}"
   expire: 'off'
 
-activemq_extra_sg_rules:
-  - proto: tcp
-    from_port: 8161
-    to_port: 8161
-    cidr_ip: 170.140.0.0/16
-  - proto: tcp
-    from_port: 8161
-    to_port: 8161
-    cidr_ip: 75.131.197.0/24
+activemq_extra_sg_rules: []

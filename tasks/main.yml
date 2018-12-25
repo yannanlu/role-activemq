@@ -1,6 +1,6 @@
 ---
-- include: update_sg.yml   # add the extra rules to the security group
-  when: activemq_admin_ip != '127.0.0.1'
+- include: update_sg.yml   # add the extra rules to the security group for EC2
+  when: ec2_sg_info is defined and activemq_broker_ip != '127.0.0.1' and activemq_extra_sg_rules|length > 0
 
 - name: Create group account for activemq
   group:
@@ -55,13 +55,62 @@
     remote_src: yes
     owner: "{{activemq_user}}"
     group: "{{activemq_group}}"
-  when: new_archive_amq|changed or not st_activemq.stat.exists
+  when: new_archive_amq is changed or not st_activemq.stat.exists
 
 - name: Create symlink of /opt/activemq
   file:
     src: "/opt/{{activemq_pkg_name}}-{{activemq_version}}"
     dest: /opt/activemq
     state: link
+
+- name: Set my_list
+  set_fact:
+    my_list: "['{{ansible_host}}']"
+
+- name: Set remote_host
+  set_fact:
+    remote_host: "{{activemq_network_brokers|difference(my_list)|first}}"
+  when: activemq_network_brokers|unique|length == 2
+
+- name: Reset remote_host to private ip
+  set_fact:
+    remote_host: "{{ec2_private_ips[0] if remote_host == activemq_network_brokers[0] else ec2_private_ips[1]}}"
+  when: ec2_private_ips is defined and ec2_private_ips|length == 2
+
+- name: Set remote uri
+  set_fact:
+    remote_uri: "static:(tcp://{{remote_host}}:{{activemq_broker_port}})"
+  when: activemq_network_brokers|unique|length == 2 and ansible_host in activemq_network_brokers and remote_host != 'localhost'
+
+- name: Display remote host and uri
+  debug:
+    msg:
+      - "remote_host: {{remote_host}}"
+      - "network_connector_uri: {{remote_uri}}"
+  when: remote_uri is defined
+
+- name: Template of activemq.xml
+  template:
+    src: activemq.xml.j2
+    dest: "/opt/activemq/conf/activemq.xml"
+    owner: "{{activemq_user}}"
+    group: "{{activemq_group}}"
+    mode: 0644
+  vars:
+    remote_host: "{{remote_host}}"
+    remote_uri: "{{remote_uri}}"
+    broker_host: "{{ansible_host}}"
+    broker_port: "{{activemq_broker_port}}"
+    broker_ip: "{{activemq_broker_ip}}"
+    broker_user: "{{activemq_broker_user}}"
+    broker_passwd: "{{activemq_broker_passwd}}"
+    ks_passwd: "{{activemq_ks_passwd}}"
+    ssl_status: "{{activemq_ssl}}"
+    jmx_status: "{{activemq_jmx}}"
+    pending_limit: "{{activemq_pending_limit}}"
+    store_usage: "{{activemq_store_usage}}"
+    temp_usage: "{{activemq_temp_usage}}"
+  notify: Restart_activemq.service
 
 - name: Template of configs
   template:
@@ -71,11 +120,27 @@
     group: "{{activemq_group}}"
     mode: 0644
   with_items:
-    - activemq.xml
     - jetty.xml
+    - jetty-realm.properties
     - users.properties
     - groups.properties
     - credentials.properties
+  notify: Restart_activemq.service
+
+- name: Copy config files
+  copy:
+    src: "{{item}}"
+    dest: "/opt/activemq/conf/{{item}}"
+    mode: 0644
+  with_items:
+    - broker.ks
+    - broker.ts
+    - java.security
+    - jmx.access
+    - jmx.password
+    - log4j.properties
+    - logging.properties
+    - login.config
   notify: Restart_activemq.service
 
 - name: Copy activemq.service
@@ -84,6 +149,32 @@
     dest: "{{activemq_systemd_dir}}/system/"
     mode: 0644
   notify: Restart_activemq.service
+
+- name: Open broker port
+  iptables:
+    chain: INPUT
+    destination_port: "{{activemq_broker_port}}"
+    action: insert
+    jump: ACCEPT
+    protocol: tcp
+    state: present
+  when: common_iptables != 'disabled' and activemq_broker_ip != '127.0.0.1'
+  register: port_amq_result
+
+- name: Open console port
+  iptables:
+    chain: INPUT
+    destination_port: "{{activemq_admin_port}}"
+    action: insert
+    jump: ACCEPT
+    protocol: tcp
+    state: present
+  when: common_iptables != 'disabled' and activemq_admin_ip != '127.0.0.1'
+  register: port_console_result
+
+- name: Save iptables
+  command: "/sbin/iptables-save"
+  when: port_amq_result is changed or port_console_result is changed
 
 - name: Get stats of monitrc
   stat:
