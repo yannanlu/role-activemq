@@ -1,0 +1,37 @@
+{
+  "Name": "rotation_stats",
+  "ClassName": "org.qbroker.monitor.NumberMonitor",
+  "Site": "LITS",
+  "Type": "NumberMonitor",
+  "Category": "ROTATION",
+  "Description": "rotate stats logs",
+  "Step": "12",
+  "Tolerance": "0",
+  "MaxRetry": "1",
+  "MaxPage": "0",
+  "QuietPeriod": "12",
+  "ExceptionTolerance": "-1",
+  "URI": "script:///bin/ls",
+  "Script": "/bin/sh -c \"/bin/ls -l {{log_dir}}/stats/*\"",
+  "Timeout": "50",
+  "Pattern": "^-[^ ]*\\s+\\d+\\s+[^ ]*\\s+[^ ]*\\s+(\\d+)",
+  "Operation": "sum",
+  "ErrorRange": [
+    "[64000000,)"
+  ],
+  "ActionGroup": [
+    {
+      "URI": "script://localhost/",
+      "Priority": "^ERR$",
+      "Script": "/bin/bash -c \"/bin/mv -f {{log_dir}}/stats/* {{log_dir}}/archive\"",
+      "Timeout": "50"
+    }
+  ],
+  "ActiveTime": {
+    "TimeWindow": [
+      {
+        "Interval": "00:00:00-24:00:00"
+      }
+    ]
+  }
+}

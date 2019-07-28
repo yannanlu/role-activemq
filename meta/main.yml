@@ -2,3 +2,5 @@
 dependencies:
   - role: monit
   - role: java
+  - role: MonitorAgent
+    when: activemq_json_files|length > 0

@@ -1,0 +1,147 @@
+{
+  "Name": "Agent",
+  "Site": "LITS",
+  "Type": "Monitor",
+  "Category": "Agent",
+  "HomeDir": "{{qb_dir}}",
+  "LogDir": "{{log_dir}}",
+  "LogDatePattern": "'.'MM",
+  "StatsURL": "{{stats_url}}",
+  "Username": "omadm",
+  "EncryptedPassword": "xTiJ6jyB0Sad0y7Bg8ym4Z6Cw/ATu8lFoY3Ui7KsHu5=",
+  "CompletedFile": "{{log_dir}}/completed",
+  "Heartbeat": "300",
+  "MaxNumberThread": "3",
+  "CheckRunawayThread": "false",
+  "MaxRetry": "4",
+  "Timeout": "600",
+  "Debug": "5",
+  "OpenSSLPlugin": "org.qbroker.security.Decryptor",
+{% if admin_port > 0 %}
+  "AdminServer": {
+    "ClassName": "org.qbroker.receiver.ServerReceiver",
+    "URI": "tcp://localhost:{{admin_port}}",
+    "Operation": "respond",
+    "Capacity": "64",
+    "Partition": "0,32",
+    "EOTBytes": "0x0a",
+    "TextMode": "1",
+    "Template": "##body##\n",
+    "Parser": {
+      "ClassName": "org.qbroker.event.EventParser"
+    },
+    "RestartScript": "/bin/bash -c \"{{qb_dir}}/bin/agentctl restart &\""
+  },
+{% endif %}
+  "MonitorGroup": [
+    {
+      "Name": "default",
+      "Monitor": [
+        "rotation_agent_out",
+        "rotation_stats"
+      ]
+    },
+    {
+      "Name": "queue",
+      "Heartbeat": "120",
+      "Capacity": "256",
+      "CheckpointDir": "{{log_dir}}/checkpoint/queue",
+      "Monitor": [
+        {
+          "Name": "queue_jmx",
+          "Template": "##queue##",
+          "Item": {
+            "DataField": "List",
+            "Type": "GenericList",
+            "Description": "JMX listing on ActiveMQ",
+            "URI": "service:jmx:rmi:///jndi/rmi://localhost:1099/jmxrmi",
+            "Username": "admin",
+            "Password": "activemq",
+            "MBeanName": "org.apache.activemq:brokerName={{broker_name}},type=Broker,destinationType=Queue,destinationName=*",
+            "KeyTemplate": "##body##",
+            "KeySubstitution": "s/^.+=([^=]+)$/$1/",
+            "XPatternGroup": [
+              {
+                "Pattern": [
+                  "(Q|q|\\d)$"
+                ]
+              },
+              {
+                "Pattern": [
+                  "(ActiveMQ|temp_queue|[Tt]est|[Dd]emo)"
+                ]
+              }
+            ],
+            "Step": "1"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "topic",
+      "Heartbeat": "120",
+      "Capacity": "256",
+      "CheckpointDir": "{{log_dir}}/checkpoint/topic",
+      "Monitor": [
+        {
+          "Name": "topic_jmx",
+          "Template": "##topic##",
+          "Substitution": "s/^destinationName=([^,]+),[^,]+,consumerId=Durable\\((.+)\\)$/$1_$2/",
+          "Item": {
+            "DataField": "List",
+            "Type": "GenericList",
+            "Description": "JMX listing on ActiveMQ",
+            "URI": "service:jmx:rmi:///jndi/rmi://localhost:1099/jmxrmi",
+            "Username": "admin",
+            "Password": "activemq",
+            "MBeanName": "org.apache.activemq:brokerName={{broker_name}},type=Broker,destinationType=Topic,endpoint=Consumer,destinationName=*,clientId=*,consumerId=*",
+            "KeyTemplate": "##body##",
+            "KeySubstitution": "s/^[^,]+,brokerName=[^,]+,destinationType=Topic,([^,]+),[^,]+,(.+)$/$1,$2/",
+            "PatternGroup": [
+              {
+                "Pattern": [
+                  "=Durable\\("
+                ]
+              }
+            ],
+            "Step": "1"
+          }
+        }
+      ]
+    },
+    {
+      "Name": "monit",
+      "Heartbeat": "60",
+      "Capacity": "128",
+      "Monitor": [
+        "system",
+        {
+          "Name": "process",
+          "Template": "##service##",
+          "Item": {
+            "DataField": "List",
+            "Type": "GenericList",
+            "Description": "list of services from xml",
+            "URI": "https://localhost:2812/_status?format=xml",
+            "Username": "monit",
+            "Password": "monit",
+            "TrustAllCertificates": "true",
+            "MaxBytes": "0",
+            "ResultType": "4",
+            "XPath": "/*/service[@type=\"3\"]",
+            "KeyTemplate": "##body##",
+            "KeySubstitution": "s/^.+<name>([^<]+)<.+$/$1/",
+            "Step": "1",
+            "XPatternGroup": [
+              {
+                "Pattern": [
+                  ">(monit|puppetd)<"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -12,11 +12,11 @@
           lazy-init="false" scope="singleton"
           init-method="start" destroy-method="stop">
     </bean>
-    <broker xmlns="http://activemq.apache.org/schema/core" brokerName="{{broker_host}}" dataDirectory="${activemq.data}">
+    <broker xmlns="http://activemq.apache.org/schema/core" brokerName="{{broker_host}}" dataDirectory="${activemq.data}" useJmx="{{jmx_status}}">
         <destinationPolicy>
             <policyMap>
               <policyEntries>
-                <policyEntry topic=">" >
+                <policyEntry topic="&gt;" durableTopicPrefetch="{{prefetch_size|default(1000)}}">
                   <pendingMessageLimitStrategy>
                     <constantPendingMessageLimitStrategy limit="{{pending_limit}}"/>
                   </pendingMessageLimitStrategy>
@@ -28,11 +28,7 @@
             <jaasAuthenticationPlugin configuration="activemq"/>
         </plugins>
         <managementContext>
-{% if jmx_status == 'enabled' %}
-            <managementContext createConnector="true"/>
-{% else %}
-            <managementContext createConnector="false"/>
-{% endif %}
+            <managementContext createConnector="{{jmx_status}}" connectorPort="{{jmx_port}}"/>
         </managementContext>
         <persistenceAdapter>
             <kahaDB directory="${activemq.data}/kahadb"/>
@@ -40,7 +36,7 @@
           <systemUsage>
             <systemUsage>
                 <memoryUsage>
-                    <memoryUsage percentOfJvmHeap="70" />
+                    <memoryUsage percentOfJvmHeap="{{percent_heap}}" />
                 </memoryUsage>
                 <storeUsage>
                     <storeUsage limit="{{store_usage}} gb"/>
@@ -50,14 +46,14 @@
                 </tempUsage>
             </systemUsage>
         </systemUsage>
-{% if remote_uri is defined and remote_host is defined %}
+{% if remote_uri|length > 0 and remote_host|length > 0 %}
         <networkConnectors>
-            <networkConnector name="T->{{remote_host}}" uri="{{remote_uri}}" duplex="false" decreaseNetworkConsumerPriority="true" networkTTL="2" userName="{{broker_user}}" password="{{broker_passwd}}" dynamicOnly="true">
+            <networkConnector name="T-{{remote_host}}" uri="{{remote_uri}}" duplex="false" decreaseNetworkConsumerPriority="true" networkTTL="2" userName="{{broker_user}}" password="{{broker_passwd}}" dynamicOnly="true">
                 <excludedDestinations>
                     <queue physicalName="&gt;"/>
                 </excludedDestinations>
             </networkConnector>
-            <networkConnector name="Q->{{remote_host}}" uri="{{remote_uri}}" duplex="false" decreaseNetworkConsumerPriority="true" networkTTL="2" userName="{{broker_user}}" password="{{broker_passwd}}" dynamicOnly="true">
+            <networkConnector name="Q-{{remote_host}}" uri="{{remote_uri}}" duplex="false" decreaseNetworkConsumerPriority="true" networkTTL="2" userName="{{broker_user}}" password="{{broker_passwd}}" dynamicOnly="true">
                 <excludedDestinations>
                     <topic physicalName="&gt;"/>
                 </excludedDestinations>

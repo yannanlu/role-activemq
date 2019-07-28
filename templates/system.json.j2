@@ -1,0 +1,30 @@
+{
+  "Name": "system",
+  "ClassName": "org.qbroker.monitor.ServiceMonitor",
+  "Site": "LITS",
+  "Type": "ServiceMonitor",
+  "Category": "SYSTEM",
+  "Description": "monitoring system via Monit",
+  "Step": "1",
+  "Tolerance": "1",
+  "MaxRetry": "2",
+  "MaxPage": "2",
+  "QuietPeriod": "60",
+  "ExceptionTolerance": "-1",
+  "URI": "https://localhost:2812/_status?format=xml",
+  "Username": "monit",
+  "Password": "monit",
+  "TrustAllCertificates": "true",
+  "MaxBytes": "0",
+  "ServiceName": "{{broker_name}}.ec2.internal",
+  "ServiceType": "system",
+  "EvalTemplate": "((##cpu_user## + ##cpu_system## + ##cpu_wait##) > 60.0) || (##memory_percent## > 80.0)",
+  "StatsLog": "{{log_dir}}/stats/{{broker_name}}.sys",
+  "ActiveTime": {
+    "TimeWindow": [
+      {
+        "Interval": "00:00:00-24:00:00"
+      }
+    ]
+  }
+}

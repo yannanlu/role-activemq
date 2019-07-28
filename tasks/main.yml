@@ -1,6 +1,22 @@
 ---
-- include: update_sg.yml   # add the extra rules to the security group for EC2
-  when: ec2_sg_info is defined and activemq_broker_ip != '127.0.0.1' and activemq_extra_sg_rules|length > 0
+- name: Set broker_sg_rules
+  set_fact:
+    broker_sg_rules: []
+
+- name: Add each sg rule to broker_sg_rules
+  set_fact:
+    broker_sg_rules: "{{broker_sg_rules}} + [{'cidr_ip':'{{item.cidr_block}}','to_port':'{{activemq_broker_port}}','from_port':'{{activemq_broker_port}}','proto':'tcp'}]"
+  with_items: "{{ec2_subnet_info}}"
+  loop_control:
+    label: "{{item.id}}: {{item.cidr_block}}"
+  when: ec2_subnet_info is defined
+
+- include: ../../ec2_launcher/tasks/update_sg.yml   # update EC2 sg rules
+  vars:
+    - sg_info: "{{ec2_sg_info}}"
+    - my_sg_rules: "{{ec2_sg_rules|unique}}"
+    - my_extra_sg_rules: "{{broker_sg_rules}} + {{activemq_sg_rules}} + {{activemq_extra_sg_rules}}"
+  when: ec2_sg_info is defined and activemq_broker_ip != '127.0.0.1' and (ec2_sg_rules|length > 0 or broker_sg_rules|length > 0 or activemq_sg_rules|length > 0 or activemq_extra_sg_rules|length > 0)
 
 - name: Create group account for activemq
   group:
@@ -15,6 +31,26 @@
     state: present
     shell: /sbin/nologin
     createhome: no
+
+- name: Modify limits.conf on nofile
+  pam_limits:
+    domain: "{{activemq_user}}"
+    limit_type: "{{ item }}"
+    limit_item: nofile
+    value: "{{activemq_nofile_limit}}"
+  with_items:
+   - hard
+   - soft      
+
+- name: Modify limits.conf on stack
+  pam_limits:
+    domain: "{{activemq_user}}"
+    limit_type: "{{ item }}"
+    limit_item: stack
+    value: "{{activemq_stack_limit}}"
+  with_items:
+    - hard
+    - soft
 
 - name: Create dirs of /opt and /var/cache/ansible
   file:
@@ -65,6 +101,8 @@
 
 - name: Set my_list
   set_fact:
+    remote_host: ''
+    remote_uri: ''
     my_list: "['{{ansible_host}}']"
 
 - name: Set remote_host
@@ -77,6 +115,11 @@
     remote_host: "{{ec2_private_ips[0] if remote_host == activemq_network_brokers[0] else ec2_private_ips[1]}}"
   when: ec2_private_ips is defined and ec2_private_ips|length == 2
 
+- name: Set br_host to private ip
+  set_fact:
+    br_host: "ip-{{ec2_private_ips[0]|replace('.','-') if ansible_host == activemq_network_brokers[0] else ec2_private_ips[1]|replace('.','-')}}"
+  when: ec2_private_ips is defined and ec2_private_ips|length == 2
+
 - name: Set remote uri
   set_fact:
     remote_uri: "static:(tcp://{{remote_host}}:{{activemq_broker_port}})"
@@ -87,7 +130,7 @@
     msg:
       - "remote_host: {{remote_host}}"
       - "network_connector_uri: {{remote_uri}}"
-  when: remote_uri is defined
+  when: remote_uri|length > 0
 
 - name: Template of activemq.xml
   template:
@@ -95,21 +138,34 @@
     dest: "/opt/activemq/conf/activemq.xml"
     owner: "{{activemq_user}}"
     group: "{{activemq_group}}"
-    mode: 0644
+    mode: 0640
   vars:
     remote_host: "{{remote_host}}"
     remote_uri: "{{remote_uri}}"
-    broker_host: "{{ansible_host}}"
+    broker_host: "{{br_host|default(ansible_host)}}"
     broker_port: "{{activemq_broker_port}}"
     broker_ip: "{{activemq_broker_ip}}"
     broker_user: "{{activemq_broker_user}}"
     broker_passwd: "{{activemq_broker_passwd}}"
     ks_passwd: "{{activemq_ks_passwd}}"
     ssl_status: "{{activemq_ssl}}"
-    jmx_status: "{{activemq_jmx}}"
+    jmx_status: "{{activemq_jmx_status}}"
+    jmx_port: "{{activemq_jmx_port}}"
+    percent_heap: "{{activemq_percent_heap}}"
+    prefetch_size: "{{activemq_prefetch_size}}"
     pending_limit: "{{activemq_pending_limit}}"
     store_usage: "{{activemq_store_usage}}"
     temp_usage: "{{activemq_temp_usage}}"
+  notify: Restart_activemq.service
+
+- name: Template of env
+  template:
+    src: env.j2
+    dest: /opt/activemq/bin/env
+    owner: "{{activemq_user}}"
+    group: "{{activemq_group}}"
+  vars:
+    opts_memory: "{{activemq_opts_memory}}"
   notify: Restart_activemq.service
 
 - name: Template of configs
@@ -118,13 +174,24 @@
     dest: "/opt/activemq/conf/{{item}}"
     owner: "{{activemq_user}}"
     group: "{{activemq_group}}"
-    mode: 0644
+    mode: 0640
   with_items:
     - jetty.xml
     - jetty-realm.properties
+    - jmx.access
+    - jmx.password
     - users.properties
     - groups.properties
     - credentials.properties
+  notify: Restart_activemq.service
+
+- name: Copy secured config files
+  copy:
+    src: "{{item}}"
+    dest: "/opt/activemq/conf/{{item}}"
+    mode: 0640
+  with_items:
+    - broker.ks
   notify: Restart_activemq.service
 
 - name: Copy config files
@@ -133,11 +200,8 @@
     dest: "/opt/activemq/conf/{{item}}"
     mode: 0644
   with_items:
-    - broker.ks
     - broker.ts
     - java.security
-    - jmx.access
-    - jmx.password
     - log4j.properties
     - logging.properties
     - login.config
@@ -194,3 +258,25 @@
     stop_program: '/usr/bin/systemctl stop activemq'
   when: st_monitrc.stat.exists
   notify: Restart_monit.service
+
+- name: Get stats of agent
+  stat:
+    path: "{{qbroker_dir}}/agent"
+    get_md5: no
+    get_checksum: no
+  register: st_agent
+
+- name: Template of json files for MonitorAgent
+  template:
+    src: "{{item}}.j2"
+    dest: "{{qbroker_dir}}/agent/{{item}}"
+    mode: 0644
+  vars:
+    stats_url: "{{MonitorAgent_stats_url}}"
+    broker_name: "{{br_host|default(ansible_host)}}"
+    admin_port: "{{MonitorAgent_admin_port}}"
+    qb_dir: "{{qbroker_dir}}"
+    log_dir: "{{qbroker_logdir}}"
+  with_items: "{{activemq_json_files}}"
+  when: st_agent.stat.exists and activemq_json_files|length > 0
+  notify: Restart_MonitorAgent

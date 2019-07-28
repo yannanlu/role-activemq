@@ -1,0 +1,26 @@
+{
+  "Name": "topic_jmx",
+  "ClassName": "org.qbroker.monitor.JMXQMonitor",
+  "Site": "LITS",
+  "Type": "JMXQMonitor",
+  "Category": "AMQ",
+  "Description": "JMX queue monitor on ##topic##",
+  "URI": "service:jmx:rmi:///jndi/rmi://localhost:1099/jmxrmi",
+  "MBeanName": "org.apache.activemq:type=Broker,brokerName={{broker_name}},destinationType=Topic,endpoint=Consumer,##topic##",
+  "Step": "1",
+  "Tolerance": "2",
+  "MaxRetry": "1",
+  "MaxPage": "1",
+  "QuietPeriod": "30",
+  "ExceptionTolerance": "-1",
+  "Username": "admin",
+  "Password": "activemq",
+  "StatsLog": "/var/log/qbroker/stats/.mq",
+  "ActiveTime": {
+    "TimeWindow": [
+      {
+        "Interval": "00:00:00-24:00:00"
+      }
+    ]
+  }
+}

@@ -1,6 +1,8 @@
 ---
 activemq_user: activemq
 activemq_group: activemq
+activemq_nofile_limit: 20480
+activemq_stack_limit: 512
 activemq_pidfile: /opt/activemq/data/activemq.pid
 activemq_pkg_name: apache-activemq
 activemq_version: 5.15.6
@@ -16,13 +18,21 @@ activemq_broker_passwd: manager
 activemq_guest_passwd: password
 activemq_ks_passwd: password
 activemq_ssl: disabled
-activemq_jmx: disabled
 activemq_store_usage: 5
 activemq_temp_usage: 3
+activemq_percent_heap: 70
 activemq_pending_limit: 1000
+activemq_prefetch_size: 1000
+activemq_opts_memory: '-Xms64M -Xmx1G'
 activemq_context_factory: org.apache.activemq.jndi.ActiveMQInitialContextFactory
 activemq_queue_connection_factory: QueueConnectionFactory
 activemq_topic_connection_factory: TopicConnectionFactory
+
+activemq_jmx_status: 'false'
+activemq_jmx_port: 1099
+activemq_jmx_user: admin
+activemq_jmx_passwd: activemq
+activemq_jmx_access: readwrite
 
 activemq_admin_ip: 127.0.0.1
 activemq_admin_port: 8161
@@ -35,4 +45,8 @@ activemq_admin_location:
   proxy: "http://{{activemq_admin_ip}}:{{activemq_admin_port}}"
   expire: 'off'
 
+activemq_sg_rules: []
+
 activemq_extra_sg_rules: []
+
+activemq_json_files: []

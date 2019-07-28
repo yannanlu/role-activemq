@@ -1,0 +1,46 @@
+{
+  "Name": "rotation_agent_out",
+  "ClassName": "org.qbroker.monitor.NumberMonitor",
+  "Site": "LITS",
+  "Type": "NumberMonitor",
+  "Category": "ROTATION",
+  "Description": "rotate Agent stdout logs",
+  "Step": "12",
+  "Tolerance": "0",
+  "MaxRetry": "1",
+  "MaxPage": "0",
+  "QuietPeriod": "12",
+  "ExceptionTolerance": "-1",
+  "URI": "file://{{log_dir}}/MonitorAgent.out",
+  "Pattern": "(\\d+)",
+  "Operation": "max",
+  "ErrorRange": [
+    "[8000000,)"
+  ],
+  "DependencyGroup": [
+    {
+      "Dependency": [
+        {
+          "Name": "file://{{log_dir}}/MonitorAgent.out",
+          "URI": "file://{{log_dir}}/MonitorAgent.out",
+          "Type": "FileTester"
+        }
+      ]
+    }
+  ],
+  "ActionGroup": [
+    {
+      "URI": "script://localhost/",
+      "Priority": "^ERR$",
+      "Script": "/bin/mv -f {{log_dir}}/MonitorAgent.out {{log_dir}}/archive",
+      "Timeout": "50"
+    }
+  ],
+  "ActiveTime": {
+    "TimeWindow": [
+      {
+        "Interval": "00:00:00-24:00:00"
+      }
+    ]
+  }
+}
