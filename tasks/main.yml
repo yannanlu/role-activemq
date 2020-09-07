@@ -220,6 +220,8 @@
     destination_port: "{{activemq_broker_port}}"
     action: insert
     jump: ACCEPT
+    match: state
+    ctstate: NEW
     protocol: tcp
     state: present
   when: common_iptables != 'disabled' and activemq_broker_ip != '127.0.0.1'
@@ -231,13 +233,15 @@
     destination_port: "{{activemq_admin_port}}"
     action: insert
     jump: ACCEPT
+    match: state
+    ctstate: NEW
     protocol: tcp
     state: present
   when: common_iptables != 'disabled' and activemq_admin_ip != '127.0.0.1'
   register: port_console_result
 
 - name: Save iptables
-  command: "/sbin/iptables-save"
+  shell: "/sbin/iptables-save > /etc/sysconfig/iptables"
   when: port_amq_result is changed or port_console_result is changed
 
 - name: Get stats of monitrc
